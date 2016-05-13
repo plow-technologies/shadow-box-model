@@ -70,11 +70,12 @@ testRect3By3  = shadowRect 3 3
 -- runTestMakePatchable = defaultMain testMakePatchable
 
 
-stringTest :: Int -> Int -> IO ()
+stringTest :: Int -> Int -> IO (Either String World)
 stringTest i j = do
      either putStrLn 
             (putStrLn . showWorld  )
-            ew2
+            ew
+     return ew
    where
      (ew2) = ((addModelToWorld i j testRect3By3) =<< ew)
      (ew) = (testWorldWithRect (4::Int) (4::Int) )
@@ -107,3 +108,8 @@ testMakePatchable  = testGroup "makePatchable tests" tests'
     isRight = either (const False) (const True)
     (Right worldWithRectangle ) = addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10))
     intersectionTests f i j = HU.assertBool  ("x=" <> show i <> " y=" <> show j) $ f $ isRight $ makePatchable i j testRect3By3 worldWithRectangle 
+
+
+-- | Print World Model pretty prints a given world
+
+

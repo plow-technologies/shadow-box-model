@@ -20,39 +20,6 @@ the theory is to create a Shadow model, that is a rectangular projection into bi
 
 Then you position that projection onto a World, which is a 2d bit array.
 
-you can do this all in 1 step with
-
-
-
->>> either (fail) (putStrLn. showWorld) $ addModelToWorld 7 7 (shadowRect 3 3) (emptyWorld 10 10)
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  X  X  X 
- _  _  _  _  _  _  _  X  X  X 
- _  _  _  _  _  _  _  X  X  X 
-
->>> let (Right world1) = addModelToWorld 7 7 (shadowRect 3 3) (emptyWorld 10 10)
-
->>> let (Right world2) = addModelToWorld 1 1 (shadowRect 3 3) world1
-
-
->>> putStrLn . showWorld $ world2
- _  _  _  _  _  _  _  _  _  _ 
- _  X  X  X  _  _  _  _  _  _ 
- _  X  X  X  _  _  _  _  _  _ 
- _  X  X  X  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  _  _  _ 
- _  _  _  _  _  _  _  X  X  X 
- _  _  _  _  _  _  _  X  X  X 
- _  _  _  _  _  _  _  X  X  X 
-
 
 
 
@@ -61,7 +28,7 @@ module Data.ShadowBox.Internal  where
 
 
 import Prelude (($),Int,Bool (..),(&&),(||),maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=)
-                ,(<$>),const,String,Maybe
+                ,(<$>),const,String,Maybe,IO,putStrLn
                 ,show,Either (..))
 
 import Data.Array.BitArray (BitArray,(!))
@@ -81,10 +48,6 @@ import Debug.Trace
 -- addModelToWorld can be used with a model to create a world that can have more models consistently added to it
 addModelToWorld :: Int -> Int -> ShadowModel -> World -> Either String World
 addModelToWorld x y sm w = addPatchToWorld <$> makePatchable x y sm w
-
-
-
-
 
 
 
@@ -198,11 +161,11 @@ data Patchable = Patchable {
 -- This runs all the boundary tests so that patches can be applied quickly
 
 makePatchable :: Int -> Int -> ShadowModel -> World -> Either String Patchable
-makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
+makePatchable xOrig yOrig s@(ShadowModel sm) w@(World world) = makePatchableFinal
   where
-    upperXBoundOfTranslation = shadowX + x
+    upperXBoundOfTranslation = shadowX + xOrig
 
-    upperYBoundOfTranslation = shadowY + y
+    upperYBoundOfTranslation = shadowY + yOrig
 
     ((_,_) , (shadowX,shadowY)) = BitArray.bounds sm
 
@@ -213,18 +176,18 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
     overlap = const  ( BitArray.or $ transformedWorld ) <$> boundsCheck
 
     eoverlap
-      | (Right True) == overlap = Left "Overlap found"
+      | (Right True) == overlap = Left "Overlap found or out of bounds"
       | otherwise = overlap
 
-    makePatchableFinal = (const $ Patchable x y s w) <$> eoverlap 
+    makePatchableFinal = (const $ Patchable xOrig yOrig s w) <$> eoverlap 
 
     transformedWorld = BitArray.ixmap ((0,0),(shadowX,shadowY)) transform twobitArray
-
-    transform i@(x',y') = maybe falseIdx readWorldValue ( world BitArray.!?  (x  + x' , y  + y') )
+    forceOverlapError = trueIdx
+    transform i@(x',y') = maybe forceOverlapError readWorldValue ( world BitArray.!?  (xOrig  + x' , yOrig  + y') )
       where       
        readWorldValue val =  if     val && (sm!i)
-                             then   (traceShow "got true" trueIdx)
-                             else   traceShow ("got false:" <> show i <> show x ) falseIdx
+                             then   trueIdx
+                             else   falseIdx
 
 
     boundsCheck
@@ -233,10 +196,9 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 
 
           | (width <= 0) || (height <= 0) = Left "Max World must be greater than zero in both dimensions"
-          | (x < 0) || (y < 0) = Left "Shadow coordinates must be greater than zero"
-          | (x > width) || (y > height) = Left $ "x must be less than " <> (show width) <> " y less than " <> (show height)
+          | (xOrig < 0) || (yOrig < 0) = Left "Shadow coordinates must be greater than zero"
+          | (xOrig > width) || (yOrig > height) = Left $ "x-origin must be less than " <> (show width) <> " y-origin less than " <> (show height)
           | otherwise = Right ()
-
 
 
 
@@ -277,8 +239,8 @@ addPatchToWorld (Patchable x y (ShadowModel sm) (World world)) = assembleWorld
     assembleWorld = (World $ BitArray.ixmap ((0,0), (width, height)) transform twobitArray)
 
     translate (xFromWorld,yFromWorld)
-      |(xFromWorld <   upperXBoundOfTranslation ) && (xFromWorld >= x) &&
-       (yFromWorld < upperYBoundOfTranslation ) && (yFromWorld >= y) = (xFromWorld - x, yFromWorld - y)
+      |(xFromWorld <=   upperXBoundOfTranslation ) && (xFromWorld >= x) &&
+       (yFromWorld <=  upperYBoundOfTranslation ) && (yFromWorld >= y) = (xFromWorld - x, yFromWorld - y)
       | otherwise = (shadowX + 1, shadowY + 1)-- force the bounds to be violated and return nothing
 
 
@@ -308,6 +270,5 @@ falseIdx = (0,1)
 -- ixmap can be used to project one array onto another. 
 twobitArray :: BitArray (Int, Int)
 twobitArray = BitArray.array (trueIdx,falseIdx) [(trueIdx, True), (falseIdx,False)]
-
 
 
