@@ -22,20 +22,37 @@ Then you position that projection onto a World, which is a 2d bit array.
 
 you can do this all in 1 step with
 
->
->> showWorld <$> addModelToWorld 4 4 (shadowRect 3 3) (emptyWorld 10 10)
-   0 1 2 3 4 5 6 7 8 9
 
-0  _ _ _ _ _ _ _ _ _ _ 
-1  _ _ _ _ _ _ _ _ _ _ 
-2  _ _ _ _ _ _ _ _ _ _ 
-3  _ _ _ _ _ _ _ _ _ _ 
-4  _ _ _ _ t t t _ _ _ 
-5  _ _ _ _ t t t _ _ _ 
-6  _ _ _ _ t t t _ _ _ 
-7  _ _ _ _ _ _ _ _ _ _ 
-8  _ _ _ _ _ _ _ _ _ _ 
-9  _ _ _ _ _ _ _ _ _ _
+
+>>> either (fail) (putStrLn. showWorld) $ addModelToWorld 7 7 (shadowRect 3 3) (emptyWorld 10 10)
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  X  X  X 
+ _  _  _  _  _  _  _  X  X  X 
+ _  _  _  _  _  _  _  X  X  X 
+
+>>> let (Right world1) = addModelToWorld 7 7 (shadowRect 3 3) (emptyWorld 10 10)
+
+>>> let (Right world2) = addModelToWorld 1 1 (shadowRect 3 3) world1
+
+
+>>> putStrLn . showWorld $ world2
+ _  _  _  _  _  _  _  _  _  _ 
+ _  X  X  X  _  _  _  _  _  _ 
+ _  X  X  X  _  _  _  _  _  _ 
+ _  X  X  X  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  _  _  _ 
+ _  _  _  _  _  _  _  X  X  X 
+ _  _  _  _  _  _  _  X  X  X 
+ _  _  _  _  _  _  _  X  X  X 
+
 
 
 
@@ -45,8 +62,9 @@ module Data.ShadowBox where
 
 import Debug.Trace (traceShow)
 import Prelude (($),Int,fmap,(.),Bool (..),(&&),(||),not,maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=),IO
-                ,(<$>),(<*>),either,const,id,(*),String,(=<<)
+                ,(<$>),(<*>),either,const,id,(*),String,(=<<),putStrLn,zip,fail
                 ,show,(++),fromIntegral,Word,Either (..))
+import Data.String (unlines)       
 import Data.Bits
 import Data.ShadowBox.Internal
 import Data.Array.BitArray (BitArray,(!))
@@ -74,7 +92,7 @@ showShadowModel (ShadowModel m) = fmap Bitwise.toListLE . ByteString.unpack . Bi
 -- | Build a  rectangle shadow of a given width and height
 -- Enter the width and height in bits
 shadowRect :: Int -> Int -> ShadowModel
-shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width - 1 ,height - 1) ) True
+shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width, height ) ) True
 
 
 
@@ -92,10 +110,21 @@ shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width - 1 ,height
 -- World
 --------------------------------------------------
 
-showWorld :: World -> [[Bool]]
-showWorld (World m) = fmap Bitwise.toListLE . ByteString.unpack . BitBS.toByteString $ m
+showWorld :: World -> String
+showWorld (World m) = mconcat $ convertDirectly
+  where
+    ((_,_),(maxX,maxY)) = BitArray.bounds m
+    convertToChar x y c = case c of
+                            True -> " " <> "X" <> " " <> finish
+                            False -> " " <> "_" <> " " <> finish
+        where
+          finish
+            |y == maxY = "\n" 
+            |otherwise = ""
 
 
+
+    convertDirectly = [convertToChar x y (m!(x,y)) | x <-[0..maxX] , y <- [0.. maxY]]
 -- | World shadows are either created empty or are built up by inserting shadows
 -- into them.  They are correct by construction because these are the only way to build them
 newtype World = World { _unWorldShadow :: BitArray (Int,Int)}
@@ -139,7 +168,9 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
     
     ((_,_) , (shadowX,shadowY)) = BitArray.bounds sm
     
-    ((_,_) , (width,height)) = BitArray.bounds world
+    ((_,_) , (maxWorldX,maxWorldY)) = BitArray.bounds world
+    width = maxWorldX + 1
+    height = maxWorldY + 1
 
     overlap = const  ( BitArray.or $ transformedWorld ) <$> boundsCheck
     
@@ -159,7 +190,10 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 
 
     boundsCheck
-          | (upperXBoundOfTranslation > width) && (upperYBoundOfTranslation > height) = Left $ "boundsa exceeded"
+          | (upperXBoundOfTranslation > width) || (upperYBoundOfTranslation > height) = Left $ "bounds exceeded upperX:" <> (show upperXBoundOfTranslation) <> " width:" <> (show width) <>
+                                                                                                   "bounds exceeded upperY:" <> (show upperYBoundOfTranslation) <> " height:" <> (show height)
+
+
           | (width <= 0) || (height <= 0) = Left "Max World must be greater than zero in both dimensions"
           | (x < 0) || (y < 0) = Left "Shadow coordinates must be greater than zero"
           | (x > width) || (y > height) = Left $ "x must be less than " <> (show width) <> " y less than " <> (show height)
