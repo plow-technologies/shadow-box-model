@@ -16,6 +16,15 @@ Then by looking for an empty intersection set, collissions are avoided and a new
 
 Algorithmic complexity is determined by the grid size only.
 
+the theory is to create a Shadow model, that is a rectangular projection into bits.
+
+Then you position that projection onto a World, which is a 2d bit array.
+
+you can do this all in 1 step with
+
+>>> showWorld <$> addModeltoworld posX posY (shadowRect 3 3) (emptyWorld 300 300)
+  (
+
 
 | -}
 
@@ -50,8 +59,9 @@ showShadowModel (ShadowModel m) = fmap Bitwise.toListLE . ByteString.unpack . Bi
 
 
 -- | Build a  rectangle shadow of a given width and height
+-- Enter the width and height in bits
 shadowRect :: Int -> Int -> ShadowModel
-shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width,height) ) True
+shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width - 1 ,height - 1) ) True
 
 
 
@@ -81,9 +91,12 @@ val !?  ix = ba BitArray.!? ix
   where
     (World ba) = val
 
+
+
 -- | Build a world with no shadows
+-- The width and height are in pixel length
 emptyWorld :: Int -> Int -> World
-emptyWorld width height = World $ BitArray.fill ((0,0), (width,height) ) False
+emptyWorld width height = World $ BitArray.fill ((0,0), (width - 1 ,height -1 ) ) False
 
 
 
@@ -93,13 +106,16 @@ emptyWorld width height = World $ BitArray.fill ((0,0), (width,height) ) False
 
 -- | overlapping
 -- if any bit is 1 inff both worlds, an intersection is reported as true
-
 data Patchable = Patchable {
             _ix :: !Int
          ,  _iy :: !Int
-         ,  _shadow :: !ShadowModel
-         ,  _world  :: !World}
+         ,  _shadow :: ShadowModel
+         ,  _world  :: World}
 
+
+
+-- | Make a patchable world, grouping world and model together
+-- This runs all the boundary tests so that patches can be applied quickly
 
 makePatchable :: Int -> Int -> ShadowModel -> World -> Either String Patchable
 makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
@@ -143,11 +159,16 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 testMakePatchable  = testGroup "makePatchable tests" tests
   where
     tests = [ HU.testCase "a ShadowMode that is too big is rejected" tooBigShadow
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id  0 0 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id  1 1 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not  2 2 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not  3 3 )
+            , HU.testCase "      patch something when there is space"           (intersectionTests id  0 0 )
+            , HU.testCase "don't patch something when there is space"           (intersectionTests id  1 1 )
+            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id 2 2 )
+            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 3 3 )
             , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 4 4 )
+            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 5 5 )            
+            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 6 6 )
+            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id 7 7 )
+            , HU.testCase "don't patch something when there is a boundary" (intersectionTests not 8 8 )
+            , HU.testCase "don't patch something when there is a boundary" (intersectionTests not 9 9 )
             ]
             
     tooBigShadow = HU.assertBool "3x3 model, 1 x 3 world" $ either (const True) (const False) $ makePatchable 0 0 testRect3By3 (emptyWorld 1 3)
