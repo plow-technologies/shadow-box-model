@@ -18,8 +18,11 @@ Library
                         Data.ShadowBox.Internal
 --  Other-Modules:        
   Build-Depends:        base >= 4 && < 5
--- Test Suite Code
+
+                      , bytestring >= 0.10.6.0
+                        
                       , lens
+                      , bitwise
                       , regex-genex
                       , tasty                      
                       , tasty-golden
@@ -33,6 +36,7 @@ executable shadow-box-model
   GHC-Options:          -Wall
   main-is:              Main.hs
   Build-Depends:        base >= 4 && < 5
+                      , bytestring >= 0.10.6.0
                       , shadow-box-model
 -- Test Suite Code
                       , lens
@@ -50,13 +54,14 @@ Test-Suite spec
                       , test
   Ghc-Options:          -Wall
   Main-Is:              Spec.hs
-  Build-Depends:        base
+  Build-Depends:        QuickCheck
+                      , base
+                      , bytestring >= 0.10.6.0
                       , regex-genex
-                      , tasty                      
+                      , tasty
                       , tasty-golden
                       , tasty-hunit
                       , tasty-quickcheck
-                      , QuickCheck
                       
 
 Source-Repository head
