@@ -61,21 +61,44 @@ module Data.ShadowBox.Internal  where
 
 
 
-import Prelude (($),Int,fmap,(.),Bool (..),(&&),(||),not,maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=),IO
-                ,(<$>),either,const,id,String,Maybe
+import Prelude (($),Int,fmap,(.),Bool (..),(&&),(||),maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=)
+                ,(<$>),const,String,Maybe
                 ,show,Either (..))
-
 
 import Data.Array.BitArray (BitArray,(!))
 import qualified Data.Array.BitArray as BitArray
 import qualified Data.Array.BitArray.ByteString as BitBS
 import qualified Data.Bits.Bitwise as Bitwise
-
 import Data.Monoid
-
 import qualified Data.ByteString as ByteString
-import Test.Tasty
-import qualified Test.Tasty.HUnit as HU
+
+
+
+
+
+
+
+
+
+
+-- | Primary use Function
+-- addModelToWorld can be used with a model to create a world that can have more models consistently added to it
+addModelToWorld :: Int -> Int -> ShadowModel -> World -> Either String World
+addModelToWorld x y sm w = addPatchToWorld <$> makePatchable x y sm w
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -84,9 +107,20 @@ import qualified Test.Tasty.HUnit as HU
 newtype ShadowModel  = ShadowModel {_unshadowModel :: BitArray (Int,Int)}
 
 
-showShadowModel :: ShadowModel -> [[Bool]]
-showShadowModel (ShadowModel m) = fmap Bitwise.toListLE . ByteString.unpack . BitBS.toByteString $ m
+showShadowModel :: ShadowModel -> String
+showShadowModel (ShadowModel m) = mconcat $ convertDirectly
+  where
+    ((_,_),(maxX,maxY)) = BitArray.bounds m
 
+    convertDirectly = [convertToChar x y (m!(x,y)) | x <-[0..maxX] , y <- [0.. maxY]]
+
+    convertToChar _ y c = case c of
+                             True -> " " <> "X" <> " " <> finish
+                             False -> " " <> "_" <> " " <> finish
+        where
+          finish
+            |y == maxY = "\n" 
+            |otherwise = ""
 
 
 -- | Build a  rectangle shadow of a given width and height
@@ -110,10 +144,17 @@ shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width, height ) )
 -- World
 --------------------------------------------------
 
+
+-- | PRetty Print the World into a String
 showWorld :: World -> String
 showWorld (World m) = mconcat $ convertDirectly
   where
     ((_,_),(maxX,maxY)) = BitArray.bounds m
+
+    
+    convertDirectly = [convertToChar x y (m!(x,y)) | x <-[0..maxX] , y <- [0.. maxY]]
+
+    
     convertToChar _ y c = case c of
                              True -> " " <> "X" <> " " <> finish
                              False -> " " <> "_" <> " " <> finish
@@ -124,7 +165,7 @@ showWorld (World m) = mconcat $ convertDirectly
 
 
 
-    convertDirectly = [convertToChar x y (m!(x,y)) | x <-[0..maxX] , y <- [0.. maxY]]
+    
 -- | World shadows are either created empty or are built up by inserting shadows
 -- into them.  They are correct by construction because these are the only way to build them
 newtype World = World { _unWorldShadow :: BitArray (Int,Int)}
@@ -150,8 +191,8 @@ emptyWorld width height = World $ BitArray.fill ((0,0), (width - 1 ,height -1 ) 
 -- | overlapping
 -- if any bit is 1 inff both worlds, an intersection is reported as true
 data Patchable = Patchable {
-            _ix :: !Int
-         ,  _iy :: !Int
+            _ix :: {-# UNPACK  #-} !Int
+         ,  _iy :: {-# UNPACK  #-}!Int
          ,  _shadow :: ShadowModel
          ,  _world  :: World}
 
@@ -163,7 +204,7 @@ data Patchable = Patchable {
 makePatchable :: Int -> Int -> ShadowModel -> World -> Either String Patchable
 makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
   where
-    upperXBoundOfTranslation = (shadowX + x)
+    upperXBoundOfTranslation = shadowX + x
 
     upperYBoundOfTranslation = shadowY + y
 
@@ -204,102 +245,9 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 
 
 
-testMakePatchable :: TestTree
-testMakePatchable  = testGroup "makePatchable tests" tests
-  where
-    tests = [ HU.testCase "a ShadowMode that is too big is rejected" tooBigShadow
-            , HU.testCase "      patch something when there is space"           (intersectionTests id  0 0 )
-            , HU.testCase "don't patch something when there is space"           (intersectionTests id  1 1 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id 2 2 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 3 3 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 4 4 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 5 5 )            
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 6 6 )
-            , HU.testCase "don't patch something when there is an intersection" (intersectionTests id 7 7 )
-            , HU.testCase "don't patch something when there is a boundary" (intersectionTests not 8 8 )
-            , HU.testCase "don't patch something when there is a boundary" (intersectionTests not 9 9 )
-            ]
-
-    tooBigShadow = HU.assertBool "3x3 model, 1 x 3 world" $ either (const True) (const False) $ makePatchable 0 0 testRect3By3 (emptyWorld 1 3)
-
-    
-    isRight = either (const False) (const True)
-    (Right worldWithRectangle ) = addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10))
-    intersectionTests f i j = HU.assertBool  ("x=" <> show i <> " y=" <> show j) $ f $ isRight $ makePatchable i j testRect3By3 worldWithRectangle 
 
 
 
-addModelToWorld :: Int -> Int -> ShadowModel -> World -> Either String World
-addModelToWorld x y sm w = addPatchToWorld <$> makePatchable x y sm w
-
-
-
-
-
-runTestMakePatchable :: IO ()
-runTestMakePatchable = defaultMain testMakePatchable
-
-
-stringTest :: Int -> Int -> Either String String
-stringTest i j = showWorld <$> (addModelToWorld i j testRect3By3 w)
-  where
-    (Right w) = (testWorldWithRect (4::Int) (4::Int) )
-
-
-testWorldWithRect :: t -> t1 -> Either String World
-testWorldWithRect _ _ = (addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10)))
-
-
-
-
-
-{-- 
-testCheckIntersection :: TestTree
-testCheckIntersection = testGroup "makePatchable tests" tests
-  where
-    tests = [ QC.testProperty "empty worlds are empty after intersection"  testEmpty
-            , QC.testProperty "intersection of a world with itself is a collission" testIdentityCollission]    
-
---    testEmpty :: Int -> Int -> Bool
---    testEmpty = (\i j -> not $ checkIntersection (emptyWorld i j) (emptyWorld i j) )
-
-    worldWithRect  = addPatchToWorld 4 4 testRect3By3 (emptyWorld 10 10)
-    testRect3By3 = shadowRect 3 3
-
-    testIdentityCollission (i'::Word) (j'::Word) = either (const False) (id) $ checkIntersection <$>
-                                                                               (addPatchToWorld i j testRect3By3 (emptyWorld imax jmax) ) <*> 
-                                                                               (addPatchToWorld i j testRect3By3 (emptyWorld imax jmax) )  
-        where
-         i = fromIntegral i' + 10  
-         j = fromIntegral j' + 10 
-         imax = 2* i
-         jmax = 2 * j
-
-runTestCheckIntersection = defaultMain testCheckIntersection      
-
---}
-
-
-
-
-
-
-
-
- -- Patch util functions
-
-trueIdx :: (Int,Int)
-trueIdx = (0,0)
-
-
-falseIdx:: (Int,Int)
-falseIdx = (0,1)
-
-
-
-
-twobitArray :: BitArray (Int, Int)
-twobitArray = BitArray.array (trueIdx,falseIdx) [(trueIdx, True), (falseIdx,False)]
 
 
 
@@ -314,6 +262,7 @@ twobitArray = BitArray.array (trueIdx,falseIdx) [(trueIdx, True), (falseIdx,Fals
 -- the matrix that is projected is actually just [0,1], it uses it as an intermediate while reading
 -- values out of sm.  This allows us to control a true or false value without having to convert to a
 -- list
+
 addPatchToWorld  :: Patchable
      -> World
 addPatchToWorld (Patchable x y (ShadowModel sm) (World world)) = assembleWorld
@@ -346,40 +295,23 @@ addPatchToWorld (Patchable x y (ShadowModel sm) (World world)) = assembleWorld
                        else falseIdx
 
 
-
-
-
-
-
--- Test for Add Model to empty world
-
-testAddModelToEmptyWorld :: TestTree
-testAddModelToEmptyWorld = testGroup "addModelToEmptyWorld tests" tests
-  where
-    tests = [ HU.testCase "test move correct" (testIndexesMatch False 3 3)
-            , HU.testCase "test move correct" (testIndexesMatch True 4 4)
-            , HU.testCase "test move correct" (testIndexesMatch True 5 5)
-            , HU.testCase "test move correct" (testIndexesMatch True 6 6)
-            , HU.testCase "test move correct" (testIndexesMatch False 7 7)
-            , HU.testCase "test move correct" (testIndexesMatch False 0 0)]
-
-    ((World worldWithModel)) = addPatchToWorld patchAndWorld
-      where
-        (Right  patchAndWorld ) = makePatchable 4 4 testRect3By3 (emptyWorld 10 10) 
-    testIndexesMatch b i j = (HU.assertEqual (show i <> " : " <> show j) b (indexesMatch i j))
-    indexesMatch i j = (worldWithModel ! (i,j)) 
-
-
-
-runTestAddModelToEmptyWorld :: IO ()
-runTestAddModelToEmptyWorld = defaultMain testAddModelToEmptyWorld
-
-
-testRect3By3 :: ShadowModel
-testRect3By3  = shadowRect 3 3
-
-
-
 --------------------------------------------------
--- Tests
+-- Patch util functions
 --------------------------------------------------
+trueIdx :: (Int,Int)
+trueIdx = (0,0)
+
+
+falseIdx:: (Int,Int)
+falseIdx = (0,1)
+
+
+
+-- | The index mapping in bit array makes fora  common pattern to convert from one array into another
+-- using an intermediate structure and exploiting the fact that each array can only be True or false.
+-- ixmap can be used to project one array onto another. 
+twobitArray :: BitArray (Int, Int)
+twobitArray = BitArray.array (trueIdx,falseIdx) [(trueIdx, True), (falseIdx,False)]
+
+
+
