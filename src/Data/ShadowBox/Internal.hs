@@ -60,17 +60,13 @@ you can do this all in 1 step with
 module Data.ShadowBox.Internal  where
 
 
-
-import Prelude (($),Int,fmap,(.),Bool (..),(&&),(||),maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=)
+import Prelude (($),Int,Bool (..),(&&),(||),maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=)
                 ,(<$>),const,String,Maybe
                 ,show,Either (..))
 
 import Data.Array.BitArray (BitArray,(!))
 import qualified Data.Array.BitArray as BitArray
-import qualified Data.Array.BitArray.ByteString as BitBS
-import qualified Data.Bits.Bitwise as Bitwise
 import Data.Monoid
-import qualified Data.ByteString as ByteString
 
 
 
@@ -107,8 +103,8 @@ addModelToWorld x y sm w = addPatchToWorld <$> makePatchable x y sm w
 newtype ShadowModel  = ShadowModel {_unshadowModel :: BitArray (Int,Int)}
 
 
-showShadowModel :: ShadowModel -> String
-showShadowModel (ShadowModel m) = mconcat $ convertDirectly
+showShadowBoxModel :: ShadowModel -> String
+showShadowBoxModel (ShadowModel m) = mconcat $ convertDirectly
   where
     ((_,_),(maxX,maxY)) = BitArray.bounds m
 
