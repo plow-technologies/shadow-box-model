@@ -68,7 +68,7 @@ import Data.Array.BitArray (BitArray,(!))
 import qualified Data.Array.BitArray as BitArray
 import Data.Monoid
 
-
+import Debug.Trace
 
 
 
@@ -122,7 +122,7 @@ showShadowBoxModel (ShadowModel m) = mconcat $ convertDirectly
 -- | Build a  rectangle shadow of a given width and height
 -- Enter the width and height in bits
 shadowRect :: Int -> Int -> ShadowModel
-shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width, height ) ) True
+shadowRect width height = ShadowModel $ BitArray.fill ((0,0), (width - 1, height -1) ) True
 
 
 
@@ -220,11 +220,11 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 
     transformedWorld = BitArray.ixmap ((0,0),(shadowX,shadowY)) transform twobitArray
 
-    transform i@(x',y') = maybe falseIdx readWorldValue ( world BitArray.!?  ((x - 1) + x',(y - 1) + y') )
+    transform i@(x',y') = maybe falseIdx readWorldValue ( world BitArray.!?  (x  + x' , y  + y') )
       where       
        readWorldValue val =  if     val && (sm!i)
-                             then   trueIdx
-                             else   falseIdx
+                             then   (traceShow "got true" trueIdx)
+                             else   traceShow ("got false:" <> show i <> show x ) falseIdx
 
 
     boundsCheck

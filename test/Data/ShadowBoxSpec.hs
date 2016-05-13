@@ -70,14 +70,18 @@ testRect3By3  = shadowRect 3 3
 -- runTestMakePatchable = defaultMain testMakePatchable
 
 
--- stringTest :: Int -> Int -> Either String String
--- stringTest i j = showWorld <$> (addModelToWorld i j testRect3By3 w)
---   where
---     (Right w) = (testWorldWithRect (4::Int) (4::Int) )
+stringTest :: Int -> Int -> IO ()
+stringTest i j = do
+     either putStrLn 
+            (putStrLn . showWorld  )
+            ew2
+   where
+     (ew2) = ((addModelToWorld i j testRect3By3) =<< ew)
+     (ew) = (testWorldWithRect (4::Int) (4::Int) )
 
 
--- testWorldWithRect :: t -> t1 -> Either String World
--- testWorldWithRect _ _ = (addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10)))
+testWorldWithRect :: t -> t1 -> Either String World
+testWorldWithRect _ _ = (addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10)))
 
 
 
@@ -86,8 +90,8 @@ testMakePatchable  = testGroup "makePatchable tests" tests'
   where
     tests' = [ HU.testCase "a ShadowMode that is too big is rejected" tooBigShadow
              , HU.testCase "      patch something when there is space"           (intersectionTests id  0 0 )
-             , HU.testCase "don't patch something when there is space"           (intersectionTests id  1 1 )
-             , HU.testCase "don't patch something when there is an intersection" (intersectionTests id 2 2 )
+             , HU.testCase "don't patch something when there is an intersection" (intersectionTests id  1 1 )
+             , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 2 2 )
              , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 3 3 )
              , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 4 4 )
              , HU.testCase "don't patch something when there is an intersection" (intersectionTests not 5 5 )            

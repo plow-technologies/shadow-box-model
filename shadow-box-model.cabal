@@ -31,6 +31,7 @@ Test-Suite spec
   Main-Is:              Spec.hs
   Build-Depends:        QuickCheck
                       , base
+                      , bitwise
                       , bytestring >= 0.10.6.0
                       , regex-genex
                       , tasty
