@@ -60,23 +60,23 @@ you can do this all in 1 step with
 module Data.ShadowBox.Internal  where
 
 
-import Debug.Trace (traceShow)
+
 import Prelude (($),Int,fmap,(.),Bool (..),(&&),(||),not,maybe,(==),otherwise,(-),(+),(<),(>),(>=),(<=),IO
-                ,(<$>),(<*>),either,const,id,(*),String,(=<<),putStrLn,zip,fail
-                ,show,(++),fromIntegral,Word,Either (..))
-import Data.String (unlines)       
-import Data.Bits
+                ,(<$>),either,const,id,String,Maybe
+                ,show,Either (..))
+
+
 import Data.Array.BitArray (BitArray,(!))
 import qualified Data.Array.BitArray as BitArray
 import qualified Data.Array.BitArray.ByteString as BitBS
 import qualified Data.Bits.Bitwise as Bitwise
-import Data.ByteString (ByteString)
+
 import Data.Monoid
 
 import qualified Data.ByteString as ByteString
 import Test.Tasty
 import qualified Test.Tasty.HUnit as HU
-import qualified Test.Tasty.QuickCheck as QC
+
 
 
 
@@ -84,6 +84,7 @@ import qualified Test.Tasty.QuickCheck as QC
 newtype ShadowModel  = ShadowModel {_unshadowModel :: BitArray (Int,Int)}
 
 
+showShadowModel :: ShadowModel -> [[Bool]]
 showShadowModel (ShadowModel m) = fmap Bitwise.toListLE . ByteString.unpack . BitBS.toByteString $ m
 
 
@@ -113,9 +114,9 @@ showWorld :: World -> String
 showWorld (World m) = mconcat $ convertDirectly
   where
     ((_,_),(maxX,maxY)) = BitArray.bounds m
-    convertToChar x y c = case c of
-                            True -> " " <> "X" <> " " <> finish
-                            False -> " " <> "_" <> " " <> finish
+    convertToChar _ y c = case c of
+                             True -> " " <> "X" <> " " <> finish
+                             False -> " " <> "_" <> " " <> finish
         where
           finish
             |y == maxY = "\n" 
@@ -128,6 +129,7 @@ showWorld (World m) = mconcat $ convertDirectly
 -- into them.  They are correct by construction because these are the only way to build them
 newtype World = World { _unWorldShadow :: BitArray (Int,Int)}
 
+(!?) :: World -> (Int, Int) -> Maybe Bool
 val !?  ix = ba BitArray.!? ix
   where
     (World ba) = val
@@ -202,6 +204,7 @@ makePatchable x y s@(ShadowModel sm) w@(World world) = makePatchableFinal
 
 
 
+testMakePatchable :: TestTree
 testMakePatchable  = testGroup "makePatchable tests" tests
   where
     tests = [ HU.testCase "a ShadowMode that is too big is rejected" tooBigShadow
@@ -219,15 +222,7 @@ testMakePatchable  = testGroup "makePatchable tests" tests
 
     tooBigShadow = HU.assertBool "3x3 model, 1 x 3 world" $ either (const True) (const False) $ makePatchable 0 0 testRect3By3 (emptyWorld 1 3)
 
-    emptyWorldPatchTest (i'::Word) (j' :: Word) = makeTestPatch
-      where
-         makeTestPatch = isRight $ makePatchable  i j testRect3By3 (emptyWorld imax jmax)
-         i = 30 -- fromIntegral i' + 10  
-         j = 30 -- fromIntegral j' + 10 
-         imax = 300
-         jmax = 300
-
-
+    
     isRight = either (const False) (const True)
     (Right worldWithRectangle ) = addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10))
     intersectionTests f i j = HU.assertBool  ("x=" <> show i <> " y=" <> show j) $ f $ isRight $ makePatchable i j testRect3By3 worldWithRectangle 
@@ -241,13 +236,18 @@ addModelToWorld x y sm w = addPatchToWorld <$> makePatchable x y sm w
 
 
 
+runTestMakePatchable :: IO ()
 runTestMakePatchable = defaultMain testMakePatchable
 
 
+stringTest :: Int -> Int -> Either String String
 stringTest i j = showWorld <$> (addModelToWorld i j testRect3By3 w)
   where
-    (Right w) = (testWorldWithRect 4 4 )
-testWorldWithRect i j = (addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10)))
+    (Right w) = (testWorldWithRect (4::Int) (4::Int) )
+
+
+testWorldWithRect :: t -> t1 -> Either String World
+testWorldWithRect _ _ = (addPatchToWorld <$> (makePatchable 4 4 testRect3By3 (emptyWorld 10 10)))
 
 
 
@@ -287,13 +287,18 @@ runTestCheckIntersection = defaultMain testCheckIntersection
 
 
  -- Patch util functions
+
+trueIdx :: (Int,Int)
 trueIdx = (0,0)
+
+
+falseIdx:: (Int,Int)
 falseIdx = (0,1)
-testRect3By3  = shadowRect 3 3
 
 
 
 
+twobitArray :: BitArray (Int, Int)
 twobitArray = BitArray.array (trueIdx,falseIdx) [(trueIdx, True), (falseIdx,False)]
 
 
@@ -368,3 +373,13 @@ testAddModelToEmptyWorld = testGroup "addModelToEmptyWorld tests" tests
 
 runTestAddModelToEmptyWorld :: IO ()
 runTestAddModelToEmptyWorld = defaultMain testAddModelToEmptyWorld
+
+
+testRect3By3 :: ShadowModel
+testRect3By3  = shadowRect 3 3
+
+
+
+--------------------------------------------------
+-- Tests
+--------------------------------------------------
