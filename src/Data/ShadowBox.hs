@@ -22,8 +22,21 @@ Then you position that projection onto a World, which is a 2d bit array.
 
 you can do this all in 1 step with
 
->>> showWorld <$> addModeltoworld posX posY (shadowRect 3 3) (emptyWorld 300 300)
-  (
+>
+>> showWorld <$> addModelToWorld 4 4 (shadowRect 3 3) (emptyWorld 10 10)
+   0 1 2 3 4 5 6 7 8 9
+
+0  _ _ _ _ _ _ _ _ _ _ 
+1  _ _ _ _ _ _ _ _ _ _ 
+2  _ _ _ _ _ _ _ _ _ _ 
+3  _ _ _ _ _ _ _ _ _ _ 
+4  _ _ _ _ t t t _ _ _ 
+5  _ _ _ _ t t t _ _ _ 
+6  _ _ _ _ t t t _ _ _ 
+7  _ _ _ _ _ _ _ _ _ _ 
+8  _ _ _ _ _ _ _ _ _ _ 
+9  _ _ _ _ _ _ _ _ _ _
+
 
 
 | -}
